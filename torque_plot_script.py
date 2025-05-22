@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 from scipy.signal import savgol_filter
 import io
 import matplotlib.pyplot as plt
+import plotly.io as pio
 
 st.set_page_config(layout="wide")
 
@@ -22,12 +23,12 @@ if uploaded_file is not None:
         '#04.002': 'Current_A'
     })
 
-    df['Torque_raw'] = -df['Current_A'] * 4.8
+    df['Torque_raw'] = -df['Current_A'] * 1.6
     df['Torque_smoothed'] = savgol_filter(df['Torque_raw'], window_length=51, polyorder=3)
     df['Speed_RPM'] = -df['Speed_RPM']
 
     mean_speed = df[df['Speed_RPM'] > 10]['Speed_RPM'].mean()
-    threshold = mean_speed - 10
+    threshold = mean_speed - 5
     st.info(f"סף סינון מהירות: {threshold:.2f} RPM")
 
     sections = []
@@ -139,4 +140,18 @@ if uploaded_file is not None:
         data=csv_buf.getvalue(),
         file_name=f"{filename.replace('.csv','')}_mean_{mean_torque:.2f}.csv",
         mime="text/csv"
+    )
+
+    # יצירת HTML עם שני הגרפים
+    html_buf = io.StringIO()
+    html_content = f"<h2>Torque + Speed</h2>" + pio.to_html(fig1, full_html=False, include_plotlyjs='cdn')
+    html_content += f"<h2>Mean Torque Segments</h2>" + pio.to_html(fig2, full_html=False, include_plotlyjs=False)
+    html_buf.write(html_content)
+    html_buf.seek(0)
+
+    st.download_button(
+        label="🌐 הורד גרפים אינטרקטיביים (HTML)",
+        data=html_buf.getvalue(),
+        file_name=f"{filename.replace('.csv','')}_interactive.html",
+        mime="text/html"
     )
