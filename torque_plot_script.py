@@ -28,7 +28,7 @@ if uploaded_file is not None:
     df['Speed_RPM'] = -df['Speed_RPM']
 
     mean_speed = df[df['Speed_RPM'] > 10]['Speed_RPM'].mean()
-    threshold = mean_speed - 10
+    threshold = mean_speed - 15
     st.info(f"סף סינון מהירות: {threshold:.2f} RPM")
 
     sections = []
