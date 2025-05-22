@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from scipy.signal import savgol_filter
 import io
 import matplotlib.pyplot as plt
@@ -26,7 +27,7 @@ if uploaded_file is not None:
     df['Speed_RPM'] = -df['Speed_RPM']
 
     mean_speed = df[df['Speed_RPM'] > 10]['Speed_RPM'].mean()
-    threshold = mean_speed - 10
+    threshold = mean_speed - 5
     st.info(f"סף סינון מהירות: {threshold:.2f} RPM")
 
     sections = []
@@ -57,16 +58,21 @@ if uploaded_file is not None:
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("🎯 גרף מומנט + מהירות (אינטראקטיבי)")
-        fig1 = go.Figure()
+        st.subheader("🎯 גרף מומנט + מהירות (אינטראקטיבי עם סקאלות נפרדות)")
+        fig1 = make_subplots(specs=[[{"secondary_y": True}]])
         fig1.add_trace(go.Scatter(x=df['Time_ms'], y=df['Torque_raw'],
-                                  mode='lines', name='Torque Raw', opacity=0.3))
+                                  mode='lines', name='Torque Raw', opacity=0.3), secondary_y=False)
         fig1.add_trace(go.Scatter(x=df['Time_ms'], y=df['Torque_smoothed'],
-                                  mode='lines', name='Torque Smoothed'))
+                                  mode='lines', name='Torque Smoothed'), secondary_y=False)
         fig1.add_trace(go.Scatter(x=df['Time_ms'], y=df['Speed_RPM'],
-                                  mode='lines', name='Speed [RPM]', line=dict(dash='dash')))
-        fig1.update_layout(xaxis_title="Time [ms]", yaxis_title="Value",
-                           legend_title="Signal", height=500)
+                                  mode='lines', name='Speed [RPM]', line=dict(dash='dash')), secondary_y=True)
+
+        fig1.update_layout(title="Torque + Speed",
+                           xaxis_title="Time [ms]",
+                           height=500,
+                           legend_title="Signal")
+        fig1.update_yaxes(title_text="Torque [Nm]", secondary_y=False)
+        fig1.update_yaxes(title_text="Speed [RPM]", secondary_y=True)
         st.plotly_chart(fig1, use_container_width=True)
 
     with col2:
