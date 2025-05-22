@@ -22,7 +22,7 @@ if uploaded_file is not None:
         '#04.002': 'Current_A'
     })
 
-    df['Torque_raw'] = -df['Current_A'] * 1.6
+    df['Torque_raw'] = -df['Current_A'] * 4.8
     df['Torque_smoothed'] = savgol_filter(df['Torque_raw'], window_length=51, polyorder=3)
     df['Speed_RPM'] = -df['Speed_RPM']
 
