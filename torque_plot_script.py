@@ -119,3 +119,18 @@ if uploaded_file is not None:
         file_name=f"{filename}_combined.png",
         mime="image/png"
     )
+
+    # הורדת קובץ CSV עם עמודות מקוריות + ממוצע מומנט כעמודה חדשה
+    df_export = df.copy()
+    df_export['Torque_mean_value'] = mean_torque
+
+    csv_buf = io.StringIO()
+    df_export.to_csv(csv_buf, index=False)
+    csv_buf.seek(0)
+
+    st.download_button(
+        label="📄 הורד קובץ נתונים עם ממוצע מומנט",
+        data=csv_buf.getvalue(),
+        file_name=f"{filename.replace('.csv','')}_mean_{mean_torque:.2f}.csv",
+        mime="text/csv"
+    )
