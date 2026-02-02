@@ -8,6 +8,7 @@ import io
 import plotly.io as pio
 from datetime import datetime
 
+# הגדרת דף
 st.set_page_config(layout="wide", page_title="Motor Torque Analyzer")
 
 st.title("📊 מנתח מומנט: פריצה מול עבודה יציבה")
@@ -15,7 +16,7 @@ st.title("📊 מנתח מומנט: פריצה מול עבודה יציבה")
 uploaded_file = st.file_uploader("📁 העלה קובץ CSV", type="csv")
 
 if uploaded_file is not None:
-    # --- 1. קריאת נתונים וזיהוי כותרות ---
+    # --- 1. קריאת נתונים וזיהוי כותרות אוטומטי ---
     content = uploaded_file.getvalue().decode("utf-8").splitlines()
     start_line = 0
     for i, line in enumerate(content):
@@ -46,8 +47,7 @@ if uploaded_file is not None:
     else:
         df['Torque_smoothed'], df['Speed_smoothed'] = df['Torque_raw'], df['Speed_RPM_fixed']
 
-    # --- 3. זיהוי מקטעים וחישובים דינמיים ---
-    # סף זיהוי תנועה כללי (מינימלי)
+    # --- 3. זיהוי מקטעים וחישובים דינמיים (התאמה לכל מהירות) ---
     moving_mask = df['Speed_smoothed'] > 5
     sections_indices = []
     start_idx = None
@@ -56,7 +56,7 @@ if uploaded_file is not None:
         if df['Speed_smoothed'].iloc[i] > 5 and start_idx is None:
             start_idx = i
         elif df['Speed_smoothed'].iloc[i] <= 5 and start_idx is not None:
-            if i - start_idx > 10: # מינימום 10 דגימות למקטע
+            if i - start_idx > 10:
                 sections_indices.append((start_idx, i))
             start_idx = None
 
@@ -68,10 +68,10 @@ if uploaded_file is not None:
         sec_torque = df['Torque_smoothed'].iloc[start:end]
         sec_speed = df['Speed_smoothed'].iloc[start:end]
         
-        # 1. מומנט פריצה (השיא הגבוה ביותר במקטע)
+        # מומנט פריצה (השיא הגבוה ביותר)
         breakaway_peaks.append(max(sec_torque))
         
-        # 2. זיהוי עבודה יציבה (כשהמהירות היא מעל 90% מהמקסימום של המקטע)
+        # מומנט עבודה יציב (90% ומעלה מהמהירות המקסימלית באותו מחזור)
         max_speed_in_sec = max(sec_speed)
         steady_mask = sec_speed > (max_speed_in_sec * 0.9)
         if steady_mask.any():
@@ -82,50 +82,63 @@ if uploaded_file is not None:
     avg_breakaway = np.mean(breakaway_peaks) if breakaway_peaks else 0
     avg_steady = np.mean(steady_state_means) if steady_state_means else 0
 
-    # --- 4. תצוגת מדדים ---
-    now = datetime.now().strftime("%d.%m.%y - %H:%M")
-    st.subheader(f"ניתוח הרצה: {now}")
+    # --- 4. תצוגת מדדים באפליקציה ---
+    # קבלת זמן נוכחי
+    test_time = datetime.now().strftime("%d.%m.%y-%H:%M")
     
+    st.subheader(f"ניתוח הרצה: {test_time}")
     col_a, col_b, col_c = st.columns(3)
     col_a.metric("מומנט פריצה ממוצע", f"{avg_breakaway:.2f} Nm")
     col_b.metric("מומנט עבודה יציב", f"{avg_steady:.2f} Nm")
     col_c.metric("מספר מחזורים", len(breakaway_peaks))
 
-    # --- 5. גרפים ---
+    # --- 5. יצירת גרפים ---
     fig1 = make_subplots(specs=[[{"secondary_y": True}]])
     fig1.add_trace(go.Scatter(x=df['Time_ms'], y=df['Torque_smoothed'], name='Torque [Nm]'), secondary_y=False)
     fig1.add_trace(go.Scatter(x=df['Time_ms'], y=df['Speed_smoothed'], name='Speed [RPM]', line=dict(color='green', dash='dot')), secondary_y=True)
-    
-    st.plotly_chart(fig1, use_container_width=True)
+    fig1.update_layout(title="מומנט ומהירות לאורך זמן")
 
+    fig2 = go.Figure()
     if all_sections_data:
         min_len = min(len(s) for s in all_sections_data)
         section_array = np.array([s[:min_len] for s in all_sections_data])
         mean_curve = section_array.mean(axis=0)
         
-        fig2 = go.Figure()
         for s in section_array:
             fig2.add_trace(go.Scatter(y=s, mode='lines', opacity=0.2, line=dict(color='orange'), showlegend=False))
         fig2.add_trace(go.Scatter(y=mean_curve, name='ממוצע מחזורים', line=dict(color='black', width=3)))
         fig2.add_hline(y=avg_breakaway, line_dash="dash", line_color="red", annotation_text="Breakaway")
         fig2.add_hline(y=avg_steady, line_dash="dot", line_color="blue", annotation_text="Steady State")
-        fig2.update_layout(title="השוואת מחזורים: פריצה מול עבודה")
-        st.plotly_chart(fig2, use_container_width=True)
+        fig2.update_layout(title="השוואת מחזורים: פריצה מול עבודה יציבה")
 
-    # --- 6. הורדת דוח ---
-    dynamic_filename = f"{datetime.now().strftime('%d.%m.%y')} - {avg_breakaway:.2f}NM.html"
+    st.plotly_chart(fig1, use_container_width=True)
+    st.plotly_chart(fig2, use_container_width=True)
+
+    # --- 6. הורדת דוח עם שם קובץ דינמי ---
+    st.divider()
+    
+    # עיצוב שם הקובץ בדיוק לפי הדרישה: "תאריך-שעה - מומנט.html"
+    dynamic_filename = f"{test_time} - {avg_breakaway:.2f}NM.html"
     
     html_report = f"""
     <html dir='rtl'>
+    <head><meta charset='utf-8'></head>
     <body style='font-family: sans-serif; padding: 20px;'>
-        <h1>דוח בדיקת מנוע - {now}</h1>
+        <h1>דוח בדיקת מנוע - {test_time}</h1>
         <h2 style='color: red;'>מומנט פריצה ממוצע: {avg_breakaway:.2f} Nm</h2>
-        <h2 style='color: blue;'>מומנט עבודה יציב: {avg_steady:.2f} Nm</h2>
+        <h2 style='color: blue;'>מומנט עבודה יציב (בין הפיקים): {avg_steady:.2f} Nm</h2>
+        <p>מספר מחזורים שזוהו: {len(breakaway_peaks)}</p>
         <hr>
         {pio.to_html(fig1, full_html=False, include_plotlyjs='cdn')}
+        <br>
         {pio.to_html(fig2, full_html=False, include_plotlyjs=False)}
     </body>
     </html>
     """
 
-    st.download_button("📥 הורד דוח גרפים", data=html_report, file_name=dynamic_filename, mime="text/html")
+    st.download_button(
+        label="📥 הורד דוח גרפים אינטראקטיבי",
+        data=html_report,
+        file_name=dynamic_filename,
+        mime="text/html"
+    )
